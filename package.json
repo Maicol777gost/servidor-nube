@@ -1,16 +1,26 @@
 {
   "name": "servidor-nube",
   "version": "1.0.0",
-  "description": "Servidor de control unificado para panel web y cliente Android",
+  "description": "",
   "main": "server.js",
   "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Maicol777gost/servidor-nube.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Maicol777gost/servidor-nube/issues"
+  },
+  "homepage": "https://github.com/Maicol777gost/servidor-nube#readme",
   "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.17.0"
+    "express": "^5.2.1",
+    "ws": "^8.20.1"
   }
 }
