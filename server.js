@@ -1,122 +1,114 @@
 const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
+const { Server } = require('ws');
 const path = require('path');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const PORT = process.env.PORT || 10000;
 
-const PORT = process.env.PORT || 3000;
-
-// Servir la interfaz web desde la carpeta 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ruta explícita para evitar el error "Cannot GET /"
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/status', (req, res) => {
+    res.send({ status: "online", clientes: wss.clients.size });
 });
 
-let monitorWeb = null;
-let clienteAndroid = null;
-let colaComandosPendientes = []; 
+const server = app.listen(PORT, () => {
+    console.log(`[SERVIDOR] Ejecutándose activamente en el puerto ${PORT}`);
+});
 
+const wss = new Server({ server });
+
+// Evento principal cuando alguien se conecta (Web o Celular)
 wss.on('connection', (ws) => {
+    console.log('-> Nueva entidad vinculada al WebSocket.');
+
+    // Marcar esta conexión como "desconocida" al principio
     ws.isAlive = true;
-    ws.on('pong', () => { ws.isAlive = true; });
+    ws.tipoConexion = "desconocido";
 
     ws.on('message', (message) => {
         try {
-            const data = JSON.parse(message);
+            const datos = JSON.parse(message);
 
-            switch(data.tipo) {
-                case 'REGISTRO_MONITOR':
-                    monitorWeb = ws;
-                    console.log("[SISTEMA] Panel Web vinculado con éxito.");
-                    if (clienteAndroid && clienteAndroid.readyState === WebSocket.OPEN) {
-                        monitorWeb.send(JSON.stringify({ tipo: 'ESTADO', estatus: 'CONECTADO' }));
-                    }
-                    break;
-
-                case 'REGISTRO_CLIENTE':
-                    clienteAndroid = ws;
-                    console.log("[SISTEMA] Teléfono Android vinculado.");
-                    if (monitorWeb && monitorWeb.readyState === WebSocket.OPEN) {
-                        monitorWeb.send(JSON.stringify({ tipo: 'ESTADO', estatus: 'CONECTADO' }));
-                    }
-                    
-                    if (colaComandosPendientes.length > 0) {
-                        console.log(`[COLA] Despachando ${colaComandosPendientes.length} comandos pendientes...`);
-                        colaComandosPendientes.forEach(cmd => {
-                            if (clienteAndroid.readyState === WebSocket.OPEN) {
-                                clienteAndroid.send(JSON.stringify({ tipo: cmd }));
-                            }
-                        });
-                        colaComandosPendientes = []; 
-                    }
-                    break;
-
-                case 'ACCION':
-                    console.log(`[ORDEN] Comando solicitado: ${data.comando}`);
-                    if (clienteAndroid && clienteAndroid.readyState === WebSocket.OPEN) {
-                        clienteAndroid.send(JSON.stringify({ tipo: data.comando }));
-                    } else {
-                        console.log("[AVISO] Teléfono desconectado. Guardando en cola...");
-                        colaComandosPendientes.push(data.comando);
-                        if (colaComandosPendientes.length > 5) colaComandosPendientes.shift();
-                        
-                        if (monitorWeb && monitorWeb.readyState === WebSocket.OPEN) {
-                            monitorWeb.send(JSON.stringify({ tipo: 'CONSOLA', msg: 'Dispositivo desconectado temporalmente. Comando en cola.' }));
-                        }
-                    }
-                    break;
-
-                case 'IMAGEN':
-                    if (monitorWeb && monitorWeb.readyState === WebSocket.OPEN) {
-                        monitorWeb.send(JSON.stringify({ tipo: 'DISPLAY_IMAGEN', base64: data.base64 }));
-                    }
-                    break;
-
-                case 'CONSOLA':
-                    console.log(`[LOG] ${data.msg}`);
-                    if (monitorWeb && monitorWeb.readyState === WebSocket.OPEN) {
-                        monitorWeb.send(JSON.stringify({ tipo: 'CONSOLA', msg: data.msg }));
-                    }
-                    break;
+            // 1. Identificar si es el móvil
+            if (datos.tipo === "movil") {
+                ws.tipoConexion = "movil";
+                console.log("📱 [Móvil] Sincronizado en el servidor.");
+                
+                // Avisar a TODOS los paneles web que el móvil está en línea
+                notificarEstadoAModulosWeb("CONECTADO");
+            } 
+            
+            // 2. Identificar si es la web
+            else if (datos.tipo === "web") {
+                ws.tipoConexion = "web";
+                console.log("💻 [Web] Panel administrativo en línea.");
+                
+                // Verificar si YA hay algún móvil conectado en la lista para avisarle a esta nueva web
+                if (existeMovilConectado()) {
+                    ws.send(JSON.stringify({ estadoServicio: "CONECTADO" }));
+                } else {
+                    ws.send(JSON.stringify({ estadoServicio: "DESCONECTADO" }));
+                }
             }
-        } catch (e) {
-            console.error("[ERROR] Error al procesar JSON entrante:", e);
+
+            // 3. Reenviar comandos desde la Web hacia el Celular
+            else if (datos.tipo === "comando_accion") {
+                console.log(`📡 Reenviando comando: ${datos.accion}`);
+                enviarComandoAlMovil(datos.accion);
+            }
+
+            // 4. Reenviar la foto desde el Celular hacia la Web
+            else if (datos.tipo === "resultado_foto") {
+                console.log("📸 Foto recibida del móvil. Transmitiendo a la web...");
+                enviarDatosALaWeb({ accion: "mostrar_foto", imagen: datos.imagen });
+            }
+
+        } catch (error) {
+            console.error("❌ Error decodificando datos:", error);
         }
     });
 
     ws.on('close', () => {
-        if (ws === clienteAndroid) {
-            console.log("[SISTEMA] Teléfono Android desconectado.");
-            clienteAndroid = null;
-            if (monitorWeb && monitorWeb.readyState === WebSocket.OPEN) {
-                monitorWeb.send(JSON.stringify({ tipo: 'ESTADO', estatus: 'DESCONECTADO' }));
-            }
-        } else if (ws === monitorWeb) {
-            monitorWeb = null;
+        console.log(`❌ Conexión cerrada: ${ws.tipoConexion}`);
+        if (ws.tipoConexion === "movil") {
+            // Si el móvil se desconecta, avisar a todas las webs abiertas
+            notificarEstadoAModulosWeb("DESCONECTADO");
         }
     });
 });
 
-const interval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) {
-            if (ws === clienteAndroid) clienteAndroid = null;
-            return ws.terminate();
+// --- FUNCIONES DE CONTROL PARA RECORRER LA LISTA DE CLIENTES ---
+
+function existeMovilConectado() {
+    let encontrado = false;
+    wss.clients.forEach((client) => {
+        if (client.tipoConexion === "movil" && client.readyState === 1) { // 1 = OPEN
+            encontrado = true;
         }
-        ws.isAlive = false;
-        ws.ping(); 
     });
-}, 30000);
+    return encontrado;
+}
 
-wss.on('close', () => {
-    clearInterval(interval);
-});
+function notificarEstadoAModulosWeb(estado) {
+    wss.clients.forEach((client) => {
+        if (client.tipoConexion === "web" && client.readyState === 1) {
+            client.send(JSON.stringify({ estadoServicio: estado }));
+        }
+    });
+}
 
-server.listen(PORT, () => {
-    console.log(`[SERVIDOR] Ejecutándose activamente en el puerto ${PORT}`);
-});
+function enviarComandoAlMovil(accionComando) {
+    wss.clients.forEach((client) => {
+        if (client.tipoConexion === "movil" && client.readyState === 1) {
+            client.send(JSON.stringify({ accion: accionComando }));
+        }
+    });
+}
+
+function enviarDatosALaWeb(objetoDatos) {
+    wss.clients.forEach((client) => {
+        if (client.tipoConexion === "web" && client.readyState === 1) {
+            client.send(JSON.stringify(objetoDatos));
+        }
+    });
+}
