@@ -1,0 +1,16 @@
+{
+  "name": "servidor-nube",
+  "version": "1.0.0",
+  "description": "Servidor de control unificado para panel web y cliente Android",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  }
+}

